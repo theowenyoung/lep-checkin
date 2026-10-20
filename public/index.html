@@ -447,8 +447,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 
       <section class="card" data-only="sport">
         <div class="card-h"><h2><span class="step">2</span>这次的运动</h2></div>
-        <label class="field"><span class="lbl">运动内容 <em>点下面的快捷选项，或者直接输入</em></span><input id="sportContent" type="text" list="sportList" autocomplete="off" placeholder="跑步 5 公里 / 力量训练 / 篮球…"></label>
-        <datalist id="sportList"></datalist>
+        <label class="field"><span class="lbl">运动内容 <em>点下面的快捷选项，或者直接输入</em></span><input id="sportContent" type="text" autocomplete="off" placeholder="跑步 5 公里 / 力量训练 / 篮球…"></label>
         <div class="sport-picks" id="sportPicks">
           <div class="chip-row" id="sportRecentRow" hidden><span class="row-lbl">最近</span><div class="chips" id="sportRecent"></div></div>
           <div class="chip-row"><span class="row-lbl">常用</span><div class="chips" id="sportCommon"></div></div>
@@ -485,12 +484,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
         </div>
         <div id="bookFields">
           <div class="row wrap-sm">
-            <label class="field"><span class="lbl">作者</span><input id="author" type="text" list="authorList" autocomplete="off" placeholder="稻盛和夫"></label>
-            <label class="field"><span class="lbl">书名 <em>不用加《》</em></span><input id="book" type="text" list="bookList" autocomplete="off" placeholder="干法"></label>
+            <label class="field"><span class="lbl">作者</span><input id="author" type="text" autocomplete="off" placeholder="稻盛和夫"></label>
+            <label class="field"><span class="lbl">书名 <em>不用加《》</em></span><input id="book" type="text" autocomplete="off" placeholder="干法"></label>
           </div>
           <div class="chips" id="bookChips" hidden></div>
-          <datalist id="authorList"></datalist>
-          <datalist id="bookList"></datalist>
         </div>
         <div data-only="daily">
           <label class="field"><span class="lbl">今日总结 <em>一句话以上，原创</em></span><textarea id="dailyContent" rows="5" placeholder="今天读到的、想到的……"></textarea></label>
@@ -1189,6 +1186,7 @@ const SPORT_GROUPS = [
   ['其他', ['步数', '直播运动', '体能训练']],
 ];
 const SPORT_ALL = Array.from(new Set(SPORT_COMMON.concat(...SPORT_GROUPS.map(g => g[1]))));
+const FINE_POINTER = window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
 const chipBtn = t => `<button type="button" class="chip" data-v="${esc(t)}">${esc(t)}</button>`;
 
 const EMPTY_HINT = {
@@ -1285,8 +1283,6 @@ function renderInputs() {
     const recent = state.recent.map(chipBtn).join('');
     $('#sportRecentRow').hidden = !state.recent.length;
     if ($('#sportRecent').innerHTML !== recent) $('#sportRecent').innerHTML = recent;
-    const sportOpts = Array.from(new Set(state.recent.concat(SPORT_ALL))).map(t => `<option value="${esc(t)}"></option>`).join('');
-    if ($('#sportList').innerHTML !== sportOpts) $('#sportList').innerHTML = sportOpts;
     const cur = s.content.trim();
     $$('#sportPicks [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === cur));
   } else if (tab === 'daily') {
@@ -1324,11 +1320,6 @@ function renderBooks() {
     : '';
   box.hidden = !state.books.length;
   if (box.innerHTML !== html) box.innerHTML = html;
-  const opts = list => Array.from(new Set(list)).map(v => `<option value="${esc(v)}"></option>`).join('');
-  const al = opts(state.books.map(x => x.a));
-  const bl = opts(state.books.map(x => x.b));
-  if ($('#authorList').innerHTML !== al) $('#authorList').innerHTML = al;
-  if ($('#bookList').innerHTML !== bl) $('#bookList').innerHTML = bl;
 }
 // 复制读书卡时，把这本书记进「最近读的」
 function rememberBook() {
@@ -1551,7 +1542,7 @@ $('#sportPicks').addEventListener('click', e => {
   el.value = c.dataset.v;
   state.sport.content = c.dataset.v;
   render();
-  el.focus();
+  if (FINE_POINTER) el.focus();
 });
 $('#sportLeaveOn').addEventListener('change', e => { state.sport.leaveOn = e.target.checked; render(); });
 $('#sportLeaveWeek').addEventListener('change', e => { state.sport.leaveOffset = +e.target.value; render(); });
