@@ -231,6 +231,21 @@ textarea:focus, input:focus, select:focus { border-color: var(--accent); box-sha
 .chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .recent-lbl { font-size: 12.5px; color: var(--faint); align-self: center; margin-right: 2px; }
 
+/* 运动快捷输入：最近 / 常用 / 按类别展开的更多运动 */
+.sport-picks { display: flex; flex-direction: column; gap: 8px; margin: -2px 0 14px; }
+.chip-row { display: grid; grid-template-columns: 4.6em minmax(0, 1fr); gap: 8px; align-items: start; }
+.chip-row .chips { margin: 0; }
+.row-lbl { font-size: 12.5px; color: var(--faint); padding-top: 4px; white-space: nowrap; }
+.more summary {
+  cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; font-weight: 600; color: var(--muted); padding: 2px 0;
+}
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: "▸"; color: var(--faint); transition: transform .15s; }
+.more[open] summary::before { transform: rotate(90deg); }
+.more summary:hover { color: var(--accent); }
+.more-groups { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+
 .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none; padding: 4px 0; }
 .switch input { position: absolute; opacity: 0; pointer-events: none; }
 .switch .track {
@@ -432,8 +447,16 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 
       <section class="card" data-only="sport">
         <div class="card-h"><h2><span class="step">2</span>这次的运动</h2></div>
-        <label class="field"><span class="lbl">运动内容</span><input id="sportContent" type="text" autocomplete="off" placeholder="跑步 5 公里 / 骑行 / 健身房…"></label>
-        <div class="chips" id="sportChips"></div>
+        <label class="field"><span class="lbl">运动内容 <em>点下面的快捷选项，或者直接输入</em></span><input id="sportContent" type="text" list="sportList" autocomplete="off" placeholder="跑步 5 公里 / 力量训练 / 篮球…"></label>
+        <datalist id="sportList"></datalist>
+        <div class="sport-picks" id="sportPicks">
+          <div class="chip-row" id="sportRecentRow" hidden><span class="row-lbl">最近</span><div class="chips" id="sportRecent"></div></div>
+          <div class="chip-row"><span class="row-lbl">常用</span><div class="chips" id="sportCommon"></div></div>
+          <details class="more" id="sportMore">
+            <summary>更多运动</summary>
+            <div class="more-groups" id="sportGroups"></div>
+          </details>
+        </div>
         <hr class="divider">
         <label class="switch"><input type="checkbox" id="sportLeaveOn"><span class="track"></span><span>我要请假</span></label>
         <div class="sub-fields" id="sportLeaveFields" hidden>
@@ -1154,6 +1177,20 @@ function compute() {
 let lastText = '';
 let lastRes = null;
 
+// 运动快捷选项。力量类按组规 h 条的最低数量写好（俯卧撑 100 个、卷腹 200 个……）
+const SPORT_COMMON = ['跑步', '力量训练', '骑行', '游泳', '篮球', '羽毛球', '网球', 'HIIT', 'Hip-hop', '瑜伽', '跳绳', '爬山', '步数'];
+const SPORT_GROUPS = [
+  ['有氧', ['跑步', '慢跑', '夜跑', '快走', '城市暴走', '骑行', '动感单车', '游泳', '跳绳', '椭圆机', '划船机', '爬楼梯', '登山机', '有氧操']],
+  ['力量', ['力量训练', '健身房', '撸铁', 'HIIT', '核心训练', '练腿', '练背', '练胸', '练肩', '俯卧撑 100 个', '卷腹 200 个', '引体向上 20 个', '深蹲 100 个', '平板支撑', '壶铃', 'CrossFit', 'TRX']],
+  ['球类', ['篮球', '足球', '羽毛球', '网球', '乒乓球', '排球', '匹克球', '壁球', '飞盘', '棒球', '高尔夫']],
+  ['舞蹈课程', ['Hip-hop', '街舞', '爵士舞', '尊巴', '跳舞', '团课', '搏击操', '拳击', '泰拳', '散打', '跆拳道', '空手道', '健身操', '帕梅拉跟练']],
+  ['户外', ['爬山', '徒步', '郊游', '越野跑', '攀岩', '抱石', '滑雪', '单板滑雪', '滑冰', '轮滑', '滑板', '桨板', '皮划艇', '冲浪', '赛艇']],
+  ['身心', ['瑜伽', '普拉提', '拉伸', '太极', '八段锦', '康复训练']],
+  ['其他', ['步数', '直播运动', '体能训练']],
+];
+const SPORT_ALL = Array.from(new Set(SPORT_COMMON.concat(...SPORT_GROUPS.map(g => g[1]))));
+const chipBtn = t => `<button type="button" class="chip" data-v="${esc(t)}">${esc(t)}</button>`;
+
 const EMPTY_HINT = {
   sport: '在群里复制<b>上一位</b>的打卡，粘贴到上面。这周你是第一个？那就粘贴上周最后一条，会自动清零。',
   daily: '在群里复制<b>上一位</b>的日卡，粘贴到上面。今天你是第一个？那就粘贴昨天最后一条，会自动重置。',
@@ -1245,11 +1282,13 @@ function renderInputs() {
     sel.value = String(s.leaveOffset);
     $('#sportLeaveType').value = s.leaveType;
     $('#sportLeaveOnly').checked = s.leaveOnly;
-    const defaultsChips = ['跑步', '骑行', '健身', '游泳', '爬山', '步数'];
-    const list = Array.from(new Set(state.recent.concat(defaultsChips))).slice(0, 8);
-    const chips = list.map(t => `<button type="button" class="chip" data-v="${esc(t)}">${esc(t)}</button>`).join('');
-    const box = $('#sportChips');
-    if (box.innerHTML !== chips) box.innerHTML = chips;
+    const recent = state.recent.map(chipBtn).join('');
+    $('#sportRecentRow').hidden = !state.recent.length;
+    if ($('#sportRecent').innerHTML !== recent) $('#sportRecent').innerHTML = recent;
+    const sportOpts = Array.from(new Set(state.recent.concat(SPORT_ALL))).map(t => `<option value="${esc(t)}"></option>`).join('');
+    if ($('#sportList').innerHTML !== sportOpts) $('#sportList').innerHTML = sportOpts;
+    const cur = s.content.trim();
+    $$('#sportPicks [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === cur));
   } else if (tab === 'daily') {
     const s = state.daily;
     $('#readHeading').textContent = '今天读的';
@@ -1505,7 +1544,7 @@ $('#bookChips').addEventListener('click', e => {
   }
 });
 
-$('#sportChips').addEventListener('click', e => {
+$('#sportPicks').addEventListener('click', e => {
   const c = e.target.closest('[data-v]');
   if (!c) return;
   const el = $('#sportContent');
@@ -1632,6 +1671,12 @@ function fillSettings() {
 
 // ---------------------------- 启动 ----------------------------
 fillSettings();
+$('#sportCommon').innerHTML = SPORT_COMMON.map(chipBtn).join('');
+$('#sportGroups').innerHTML = SPORT_GROUPS.map(([g, list]) =>
+  `<div class="chip-row"><span class="row-lbl">${g}</span><div class="chips">${list.map(chipBtn).join('')}</div></div>`).join('');
+$('#sportMore summary').textContent = `更多运动（${SPORT_ALL.length} 种）`;
+$('#sportMore').open = !!saved.sportMoreOpen;
+$('#sportMore').addEventListener('toggle', () => store.set({ sportMoreOpen: $('#sportMore').open }));
 $('#sportContent').value = state.sport.content;
 $('#author').value = state.author;
 $('#book').value = state.book;
