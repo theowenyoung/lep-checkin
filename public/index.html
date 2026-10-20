@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LEP 打卡助手</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="LEP 运动小组 / 读书小组（日卡、周卡）打卡格式生成器：粘贴上一位的打卡，填自己的内容，一键复制。">
+<script id="preset" type="application/json">{}</script>
+<style>
+/* 布局：左边输入（粘贴上一位 → 填自己的），右边是会粘进群里的那条消息；三种打卡各用一个颜色 */
+:root {
+  color-scheme: light;
+  --bg: #f5f3ee;
+  --surface: #ffffff;
+  --surface-2: #f2f0ea;
+  --text: #22211f;
+  --muted: #6f6b63;
+  --faint: #a19c92;
+  --border: #e5e1d8;
+  --border-strong: #d2ccc1;
+  --mine-bg: #ffe08a;
+  --mine-fg: #4a3500;
+  --chg-bg: #d4e7fb;
+  --chg-fg: #0d3b66;
+  --warn-bg: #fff3df;
+  --warn-fg: #874800;
+  --err-bg: #fde7e7;
+  --err-fg: #a11d1d;
+  --info-bg: #edf2f7;
+  --info-fg: #2c4a66;
+  --ok: #2d7a50;
+  --on-ok: #ffffff;
+  --sport: #c2581f; --sport-soft: #fbe8dc; --sport-ink: #ffffff;
+  --daily: #2d6a4a; --daily-soft: #e1efe6; --daily-ink: #ffffff;
+  --weekly: #3b5aa6; --weekly-soft: #e3e9f8; --weekly-ink: #ffffff;
+  --accent: var(--sport); --accent-soft: var(--sport-soft); --accent-ink: var(--sport-ink);
+  --shadow: 0 1px 2px rgba(40, 30, 10, .04), 0 6px 20px rgba(40, 30, 10, .05);
+  --radius: 14px;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151412;
+    --surface: #1f1e1b;
+    --surface-2: #292824;
+    --text: #ecebe6;
+    --muted: #a8a49b;
+    --faint: #75716a;
+    --border: #33312c;
+    --border-strong: #48453e;
+    --mine-bg: #6a5210;
+    --mine-fg: #ffe9a8;
+    --chg-bg: #1b3a5b;
+    --chg-fg: #cfe4ff;
+    --warn-bg: #382912;
+    --warn-fg: #ffcf8a;
+    --err-bg: #3c1b1b;
+    --err-fg: #ffb3b3;
+    --info-bg: #1b2632;
+    --info-fg: #b8d2ee;
+    --ok: #5fb98a;
+    --on-ok: #07180e;
+    --sport: #f08a4b; --sport-soft: #3a2416; --sport-ink: #1b0f07;
+    --daily: #62bd8d; --daily-soft: #16301f; --daily-ink: #06170d;
+    --weekly: #8aa5ee; --weekly-soft: #1c2540; --weekly-ink: #0a1020;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151412;
+  --surface: #1f1e1b;
+  --surface-2: #292824;
+  --text: #ecebe6;
+  --muted: #a8a49b;
+  --faint: #75716a;
+  --border: #33312c;
+  --border-strong: #48453e;
+  --mine-bg: #6a5210;
+  --mine-fg: #ffe9a8;
+  --chg-bg: #1b3a5b;
+  --chg-fg: #cfe4ff;
+  --warn-bg: #382912;
+  --warn-fg: #ffcf8a;
+  --err-bg: #3c1b1b;
+  --err-fg: #ffb3b3;
+  --info-bg: #1b2632;
+  --info-fg: #b8d2ee;
+  --ok: #5fb98a;
+  --on-ok: #07180e;
+  --sport: #f08a4b; --sport-soft: #3a2416; --sport-ink: #1b0f07;
+  --daily: #62bd8d; --daily-soft: #16301f; --daily-ink: #06170d;
+  --weekly: #8aa5ee; --weekly-soft: #1c2540; --weekly-ink: #0a1020;
+  --shadow: none;
+  color-scheme: dark;
+}
+body { --accent: var(--sport); --accent-soft: var(--sport-soft); --accent-ink: var(--sport-ink); }
+body[data-tab="daily"]  { --accent: var(--daily); --accent-soft: var(--daily-soft); --accent-ink: var(--daily-ink); }
+body[data-tab="weekly"] { --accent: var(--weekly); --accent-soft: var(--weekly-soft); --accent-ink: var(--weekly-ink); }
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.6 var(--font);
+}
+button { font: inherit; color: inherit; }
+code { font-family: inherit; background: var(--surface-2); border-radius: 5px; padding: 1px 5px; }
+
+.wrap {
+  max-width: 1120px; margin: 0 auto; padding-block: 20px 110px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* ---------- 顶部 ---------- */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo {
+  flex: none; width: 40px; height: 40px; border-radius: 11px;
+  background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; font-weight: 800; font-size: 13px; letter-spacing: .5px;
+  transition: background-color .2s;
+}
+.brand h1 { font-size: 19px; margin: 0; line-height: 1.3; }
+.brand p { margin: 0; color: var(--muted); font-size: 13px; }
+.me-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border); background: var(--surface); border-radius: 999px;
+  padding: 4px 14px 4px 4px; cursor: pointer; font-size: 14px; box-shadow: var(--shadow);
+}
+.me-btn:hover { border-color: var(--border-strong); }
+.avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent);
+  display: grid; place-items: center; font-weight: 700;
+}
+
+/* ---------- Tab：三种打卡各占一个，互不相干 ---------- */
+/* 显示哪个 Tab 的内容由 CSS 决定（body[data-tab]），即使在不跑脚本的预览里也只会出现一个 Tab */
+body:not([data-tab="daily"]):not([data-tab="weekly"]) [data-only]:not([data-only~="sport"]),
+body[data-tab="daily"]  [data-only]:not([data-only~="daily"]),
+body[data-tab="weekly"] [data-only]:not([data-only~="weekly"]) { display: none !important; }
+
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.tabs a {
+  --c: var(--sport); --c-soft: var(--sport-soft);
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  padding: 12px 14px; border-radius: 12px; text-decoration: none;
+  color: var(--muted); background: var(--surface);
+  border: 1.5px solid var(--border); box-shadow: var(--shadow);
+  transition: border-color .15s, background-color .15s;
+}
+.tabs a[data-tab="daily"]  { --c: var(--daily); --c-soft: var(--daily-soft); }
+.tabs a[data-tab="weekly"] { --c: var(--weekly); --c-soft: var(--weekly-soft); }
+.tabs a b { display: flex; align-items: center; gap: 7px; font-size: 16px; color: var(--text); }
+.tabs a b::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.tabs a small { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tabs a:hover { border-color: var(--c); }
+.tabs a[aria-current="page"] { border-color: var(--c); background: var(--c-soft); }
+.tabs a[aria-current="page"] b { color: var(--c); }
+@media (max-width: 520px) {
+  .tabs { gap: 6px; }
+  .tabs a { padding: 10px; }
+  .tabs a b { font-size: 14.5px; gap: 6px; }
+  .tabs a small { display: none; }
+}
+
+html.embedded .local-only, html:not(.embedded) .embedded-only { display: none !important; }
+.pi-sample { padding: 8px 10px; border-radius: 10px; background: var(--info-bg); color: var(--info-fg); }
+.nojs { margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); font-weight: 600; }
+
+/* ---------- 布局 ---------- */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.col-out { position: sticky; top: 16px; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .col-out { position: static; }
+}
+
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; box-shadow: var(--shadow); min-width: 0;
+}
+.card-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.card-h h2 { font-size: 15px; margin: 0; display: flex; align-items: center; gap: 8px; }
+.step {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent);
+  display: grid; place-items: center; font-size: 12px; font-weight: 800;
+}
+.h-actions { display: flex; gap: 6px; }
+
+/* ---------- 表单 ---------- */
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; min-width: 0; }
+.field:last-child { margin-bottom: 0; }
+.lbl { font-size: 13px; color: var(--muted); font-weight: 600; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.lbl em { font-style: normal; font-weight: 400; color: var(--faint); }
+.row { display: flex; gap: 10px; }
+.row > .field { flex: 1; }
+@media (max-width: 480px) { .row.wrap-sm { flex-direction: column; gap: 0; } }
+
+textarea, input[type="text"], input[type="date"], input:not([type]), select {
+  width: 100%; font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: 10px; padding: 9px 11px;
+  outline: none; transition: border-color .15s, box-shadow .15s;
+}
+select { appearance: none; -webkit-appearance: none; padding-right: 28px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 52%, calc(100% - 10px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
+textarea { resize: vertical; min-height: 96px; line-height: 1.65; }
+textarea.prev { min-height: 150px; font-size: 14px; }
+textarea::placeholder, input::placeholder { color: var(--faint); }
+textarea:focus, input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+.chip {
+  border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px;
+  padding: 3px 11px; font-size: 13px; cursor: pointer; color: var(--muted);
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.code { min-width: 34px; font-weight: 700; color: var(--text); font-size: 14px; }
+.chip.book { display: inline-flex; align-items: center; gap: 2px; padding: 0 3px 0 11px; cursor: default; }
+.chip.book button { border: 0; background: none; padding: 3px 0; cursor: pointer; color: inherit; font-size: 13px; }
+.chip.book .x { width: 18px; height: 18px; padding: 0; border-radius: 50%; line-height: 1; color: var(--faint); font-size: 14px; }
+.chip.book .x:hover { background: var(--border); color: var(--text); }
+.chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.recent-lbl { font-size: 12.5px; color: var(--faint); align-self: center; margin-right: 2px; }
+
+.switch { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 14px; user-select: none; padding: 4px 0; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch .track {
+  flex: none; width: 36px; height: 21px; border-radius: 999px; background: var(--border-strong);
+  position: relative; transition: background-color .15s;
+}
+.switch .track::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%;
+  background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.switch input:checked + .track { background: var(--accent); }
+.switch input:checked + .track::after { transform: translateX(15px); }
+.switch input:focus-visible + .track { box-shadow: 0 0 0 3px var(--accent-soft); }
+.divider { border: 0; border-top: 1px dashed var(--border); margin: 14px 0 10px; }
+
+.sub-fields { margin-top: 10px; padding: 12px; border-radius: 10px; background: var(--surface-2); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; margin-top: 2px; }
+.check input { width: 16px; height: 16px; accent-color: var(--accent); }
+.hint { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface-2); border-radius: 9px; }
+.seg button { border: 0; background: transparent; padding: 4px 12px; border-radius: 7px; cursor: pointer; font-size: 13.5px; color: var(--muted); font-weight: 600; }
+.seg button.on { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+
+.count { font-weight: 600; }
+.count.ok { color: var(--ok); }
+.count.short { color: var(--warn-fg); }
+
+/* ---------- 按钮 ---------- */
+.btn {
+  border: 1px solid var(--border-strong); background: var(--surface); border-radius: 10px;
+  padding: 8px 14px; cursor: pointer; font-weight: 600; transition: background-color .15s, border-color .15s, transform .05s;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn:active { transform: translateY(1px); }
+.btn.sm { font-size: 13px; padding: 4px 10px; border-radius: 8px; }
+.btn.ghost { background: transparent; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.06); color: var(--accent-ink); }
+.btn.big { width: 100%; padding: 12px 16px; font-size: 16px; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; filter: none; transform: none; }
+.btn.copied, .btn.copied:hover { background: var(--ok); border-color: var(--ok); color: var(--on-ok); filter: none; }
+.kbd { font-size: 12px; font-weight: 500; opacity: .75; border: 1px solid currentColor; border-radius: 5px; padding: 0 5px; line-height: 1.5; }
+
+/* ---------- 识别结果 ---------- */
+.parse-info { margin-top: 10px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 8px; }
+.pi-ok { color: var(--ok); font-weight: 600; }
+.pi-ok span { color: var(--muted); font-weight: 400; }
+.pi-bad { color: var(--err-fg); font-weight: 600; }
+.pi-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px; border-radius: 10px; background: var(--warn-bg); color: var(--warn-fg); }
+.pi-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* ---------- 输出 ---------- */
+.period { display: flex; align-items: center; gap: 8px; }
+.per-text { flex: 1; min-width: 0; text-align: center; line-height: 1.35; }
+.per-text strong { display: block; font-size: 16px; letter-spacing: .3px; }
+.per-text span { font-size: 12.5px; color: var(--muted); }
+.icon-btn {
+  flex: none; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; font-size: 18px; line-height: 1; color: var(--muted);
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.per-reset { display: block; margin: 6px auto 0; }
+
+.bubble {
+  margin: 14px 0; padding: 14px 16px; border-radius: 12px; background: var(--surface-2);
+  border: 1px solid var(--border); min-height: 180px; position: relative;
+}
+.bubble::before {
+  content: "预览"; position: absolute; top: -9px; left: 12px; font-size: 11px; font-weight: 700;
+  background: var(--surface); color: var(--faint); padding: 0 6px; border-radius: 4px; letter-spacing: 1px;
+}
+#out { margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 15px; line-height: 1.75; }
+mark { border-radius: 4px; padding: 0 1px; }
+mark.k-me { background: var(--mine-bg); color: var(--mine-fg); }
+mark.k-chg { background: var(--chg-bg); color: var(--chg-fg); }
+.empty { color: var(--faint); font-size: 14px; padding: 28px 8px; text-align: center; }
+.empty b { color: var(--muted); }
+
+.notes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.notes li { font-size: 13.5px; line-height: 1.55; padding: 8px 10px; border-radius: 9px; display: flex; gap: 8px; align-items: flex-start; }
+.notes .ni { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; margin-top: 1px; background: currentColor; }
+.notes .ni b { color: var(--surface); }
+.n-err { background: var(--err-bg); color: var(--err-fg); }
+.n-warn { background: var(--warn-bg); color: var(--warn-fg); }
+.n-info { background: var(--info-bg); color: var(--info-fg); }
+
+.legend { margin: 12px 0 0; font-size: 12.5px; color: var(--muted); }
+
+.rules { font-size: 13px; color: var(--muted); }
+.rules summary { cursor: pointer; font-weight: 700; color: var(--text); font-size: 14px; list-style: none; display: flex; align-items: center; gap: 6px; }
+.rules summary::-webkit-details-marker { display: none; }
+.rules summary::before { content: "▸"; color: var(--faint); transition: transform .15s; }
+.rules[open] summary::before { transform: rotate(90deg); }
+.rules ul { margin: 10px 0 0; padding-left: 18px; }
+.rules li { margin: 3px 0; }
+
+/* ---------- 设置 ---------- */
+.settings { margin-bottom: 16px; border-color: var(--accent); }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 10px; }
+@media (max-width: 640px) { .grid3 { grid-template-columns: 1fr 1fr; } .grid3 > :last-child { grid-column: 1 / -1; } }
+.grid3 .field { margin-bottom: 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.saved { font-size: 13px; color: var(--ok); font-weight: 600; opacity: 0; transition: opacity .2s; }
+.saved.show { opacity: 1; }
+.small { font-size: 13px; }
+.muted { color: var(--muted); }
+.settings p { margin: 0 0 12px; }
+.settings p.tail { margin: 12px 0 0; }
+
+footer { margin-top: 28px; text-align: center; font-size: 12.5px; color: var(--faint); }
+
+/* ---------- 手机底部复制条 ---------- */
+.mbar { display: none; }
+@media (max-width: 900px) {
+  .mbar {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: var(--bg); border-top: 1px solid var(--border);
+  }
+  .out-card #copyBtn { display: none; }
+  .kbd { display: none; }
+}
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(32px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(10px);
+  background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 10px; font-size: 14px;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 20; max-width: calc(100% - 32px); text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (max-width: 900px) { .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); } }
+
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+</style>
+</head>
+<body data-tab="sport">
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">LEP</div>
+      <div>
+        <h1>LEP 打卡助手</h1>
+        <p>粘贴上一位的打卡 → 填自己的内容 → 一键复制</p>
+      </div>
+    </div>
+    <button class="me-btn" id="meBtn" type="button" aria-expanded="false" aria-controls="settings">
+      <span class="avatar" id="meAvatar">?</span><span id="meLabel">我的信息</span>
+    </button>
+  </header>
+
+  <section class="card settings" id="settings" hidden>
+    <div class="card-h">
+      <h2>我的信息</h2>
+      <button class="btn ghost sm" id="closeSettings" type="button">收起</button>
+    </div>
+    <p class="muted small embedded-only">只要填一次，会保存在你现在用的这个浏览器里，下次打开这个链接自动带上。</p>
+    <p class="muted small local-only">只要填一次。填完会自动写进网址：把这个页面<b>加入书签</b>，或者把地址栏里的网址<b>拖到桌面</b>，以后从那里打开就自动带上你的信息。</p>
+    <div class="grid3">
+      <label class="field"><span class="lbl">运动组代号</span><input id="setSport" autocomplete="off" placeholder="一个字，如 欧"></label>
+      <label class="field"><span class="lbl">读书组代号</span><input id="setRead" autocomplete="off" placeholder="一个字，如 欧"></label>
+      <label class="field"><span class="lbl">读书署名 <em>用在「名字-作者《书名》」</em></span><input id="setName" autocomplete="off" placeholder="如 欧文，不填就用代号"></label>
+    </div>
+    <div class="actions">
+      <button class="btn sm local-only" id="copyLink" type="button">复制我的专属链接</button>
+      <button class="btn sm local-only" id="downloadMine" type="button">下载专属网页文件</button>
+      <span class="saved" id="savedHint">已保存 ✓</span>
+    </div>
+    <p class="muted small tail embedded-only">只参加一个小组的话，另一个代号空着就行。所有信息只存在你自己的浏览器里，不会上传到任何地方。</p>
+    <p class="muted small tail local-only">只参加一个小组的话，另一个代号空着就行。「专属网页文件」是一个已经填好你信息的 .html，放桌面双击就能用（别转发给别人，转发请发原版）。所有信息只存在你自己的浏览器和网址里，不会上传到任何地方。</p>
+  </section>
+
+  <noscript><div class="nojs">现在是预览模式，网页的脚本没有运行，所以什么都点不动。请用浏览器打开这个文件：右键 → 打开方式 → Chrome / Safari / Edge。</div></noscript>
+
+  <nav class="tabs" aria-label="打卡类型">
+    <a data-tab="sport" href="#sport" aria-current="page"><b>运动打卡</b><small>运动小组</small></a>
+    <a data-tab="daily" href="#daily"><b>读书日卡</b><small>每天 · 次日凌晨 4 点截止</small></a>
+    <a data-tab="weekly" href="#weekly"><b>读书周卡</b><small>周日 0 点 – 周三凌晨 4 点</small></a>
+  </nav>
+
+  <main class="layout">
+    <div class="col">
+
+      <section class="card">
+        <div class="card-h">
+          <h2><span class="step">1</span><span>粘贴上一位的<span data-only="sport">运动打卡</span><span data-only="daily">日卡</span><span data-only="weekly">周卡</span></span></h2>
+          <div class="h-actions">
+            <button class="btn sm local-only" id="pasteBtn" type="button">从剪贴板粘贴</button>
+            <button class="btn ghost sm" id="clearBtn" type="button">清空</button>
+          </div>
+        </div>
+        <textarea class="prev" id="prev-sport" data-only="sport" spellcheck="false" placeholder="在群里长按 / 右键复制上一位的打卡，粘贴到这里，例如：&#10;假：W43-敏NS&#10;2026W43-星2/4，运动&#10;印0/4,星2/4,嗖0/4,橙0/4,&#10;戎1/4,如1/4,呼1/4,山1/4,&#10;……"></textarea>
+        <textarea class="prev" id="prev-daily" data-only="daily" spellcheck="false" placeholder="复制上一位的日卡粘贴到这里，例如：&#10;20261020-假：&#10;①印山多呼轻飞/苏&#10;②董杨曾星丁/毛戎&#10;③欧敏柯晴/福伯&#10;&#10;戎-稻盛和夫《干法》&#10;……"></textarea>
+        <textarea class="prev" id="prev-weekly" data-only="weekly" spellcheck="false" placeholder="复制上一位的周卡粘贴到这里，例如：&#10;2026W41-假：&#10;————周卡————&#10;①苏多呼轻飞山/印&#10;②杨董星曾毛戎丁/&#10;③伯柯敏晴福/欧&#10;……"></textarea>
+        <div class="parse-info" id="parseInfo" aria-live="polite"></div>
+      </section>
+
+      <section class="card" data-only="sport">
+        <div class="card-h"><h2><span class="step">2</span>这次的运动</h2></div>
+        <label class="field"><span class="lbl">运动内容</span><input id="sportContent" type="text" autocomplete="off" placeholder="跑步 5 公里 / 骑行 / 健身房…"></label>
+        <div class="chips" id="sportChips"></div>
+        <hr class="divider">
+        <label class="switch"><input type="checkbox" id="sportLeaveOn"><span class="track"></span><span>我要请假</span></label>
+        <div class="sub-fields" id="sportLeaveFields" hidden>
+          <div class="row">
+            <label class="field"><span class="lbl">请哪一周</span><select id="sportLeaveWeek"></select></label>
+            <label class="field"><span class="lbl">类型</span>
+              <select id="sportLeaveType">
+                <option value="SJ">事假 SJ</option>
+                <option value="BJ">病假 BJ</option>
+                <option value="NS">女生假 NS</option>
+              </select>
+            </label>
+          </div>
+          <label class="check"><input type="checkbox" id="sportLeaveOnly"><span>只请假，这次不打卡</span></label>
+          <p class="hint">周日及之前请下周假免费；周一请本周假 10 元，周二 20 元，周三 40 元，以此类推。每个周期事假最多 2 次。</p>
+        </div>
+      </section>
+
+      <section class="card" data-only="daily weekly">
+        <div class="card-h">
+          <h2><span class="step">2</span><span id="readHeading">今天读的</span></h2>
+          <div class="seg" id="weeklyMode" data-only="weekly" role="group" aria-label="周卡类型">
+            <button type="button" data-mode="checkin">打周卡</button>
+            <button type="button" data-mode="leave">请假</button>
+          </div>
+        </div>
+        <div id="bookFields">
+          <div class="row wrap-sm">
+            <label class="field"><span class="lbl">作者</span><input id="author" type="text" list="authorList" autocomplete="off" placeholder="稻盛和夫"></label>
+            <label class="field"><span class="lbl">书名 <em>不用加《》</em></span><input id="book" type="text" list="bookList" autocomplete="off" placeholder="干法"></label>
+          </div>
+          <div class="chips" id="bookChips" hidden></div>
+          <datalist id="authorList"></datalist>
+          <datalist id="bookList"></datalist>
+        </div>
+        <div data-only="daily">
+          <label class="field"><span class="lbl">今日总结 <em>一句话以上，原创</em></span><textarea id="dailyContent" rows="5" placeholder="今天读到的、想到的……"></textarea></label>
+          <hr class="divider">
+          <label class="switch"><input type="checkbox" id="dailyLeaveOn"><span class="track"></span><span>我要请假</span></label>
+          <div class="sub-fields" id="dailyLeaveFields" hidden>
+            <div class="row">
+              <label class="field"><span class="lbl">从</span><input type="date" id="dailyLeaveFrom"></label>
+              <label class="field"><span class="lbl">到</span><input type="date" id="dailyLeaveTo"></label>
+            </div>
+            <label class="check"><input type="checkbox" id="dailyLeaveOnly"><span>只请假，今天不打卡</span></label>
+            <p class="hint">日卡至少提前一天请假；超过 7 天要先找组长批准。日卡和周卡的请假是分开的。</p>
+          </div>
+        </div>
+        <div data-only="weekly">
+          <label class="field" id="weeklyContentField"><span class="lbl">本周总结 <em>200 字以上，不算标点、作者书名</em><span class="count" id="wordCount"></span></span><textarea id="weeklyContent" rows="10" placeholder="总结这周读的内容……"></textarea></label>
+          <label class="field" id="weeklyNoteField" hidden><span class="lbl">备注 <em>可以留空</em></span><input id="weeklyNote" type="text" autocomplete="off"></label>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="col col-out">
+      <section class="card out-card">
+        <div class="period">
+          <button class="icon-btn" id="perPrev" type="button" aria-label="往前">‹</button>
+          <div class="per-text"><strong id="perLabel"></strong><span id="perSub"></span></div>
+          <button class="icon-btn" id="perNext" type="button" aria-label="往后">›</button>
+        </div>
+        <button class="btn ghost sm per-reset" id="perReset" type="button" hidden>回到今天</button>
+        <div class="bubble">
+          <pre id="out" hidden></pre>
+          <div class="empty" id="outEmpty"></div>
+        </div>
+        <button class="btn primary big" id="copyBtn" type="button" disabled><span>复制打卡内容</span><span class="kbd" id="kbd">⌘ ↵</span></button>
+        <ul class="notes" id="notes"></ul>
+        <p class="legend"><mark class="k-me">黄色</mark> 是你的改动，<mark class="k-chg">蓝色</mark> 是自动更新的部分（日期、新一轮清零等），其余原样照抄上一位。</p>
+      </section>
+
+      <details class="card rules" open>
+        <summary>组规要点</summary>
+        <ul data-only="sport">
+          <li>每周至少 4 张，每天最多 1 张，两张间隔 6 小时以上；周日 24 点截止</li>
+          <li>缺一张发 20 元红包（个数为群人数一半）；格式错一处 5 元</li>
+          <li>复制上一位，只改：代号、第几次、运动内容、自己在名单里的计数</li>
+          <li>请假写在第一行，如 <code>假：W44-欧SJ</code>（SJ 事假 · BJ 病假 · NS 女生假），人和人之间用 / 隔开，不同周用 ， 隔开；下周第一位去掉上周的</li>
+          <li>心率标准 105，要完整运动期间的心率报告</li>
+        </ul>
+        <ul data-only="daily">
+          <li>每天读 15 分钟以上 + 一句话以上原创总结；北京时间次日凌晨 4 点截止</li>
+          <li>当天第一位：把所有人移回「/」左边；之后每人把自己的代号移到本行最后</li>
+          <li>行里最后一个人也不能删「/」</li>
+          <li>署名行写成 <code>名字-作者《书名》</code>，作者和书名号缺一不可</li>
+          <li>请假写在「假：」后面：代号+起止日，不写月份，如 <code>欧21-22</code>，多人用 / 隔开</li>
+          <li>缺卡 10 元（群里拼手气红包），格式错 5 元</li>
+        </ul>
+        <ul data-only="weekly">
+          <li>有效时间：周日 0 点 – 周三凌晨 4 点</li>
+          <li>200 字以上（格式、作者书名、标点不算字数）</li>
+          <li>本周第一个打的：粘贴上周最后一条周卡，会自动换周数、清空请假、全员移回左边</li>
+          <li>拿不准上一位是谁，先在群里搜本期代码（如 2026W42）</li>
+          <li>请假：在第一个人打周卡<b>之前</b>，把代号加在「假：」后面</li>
+          <li>缺卡 20 元（直接交给组长），格式错 5 元</li>
+        </ul>
+      </details>
+    </div>
+  </main>
+
+  <footer>LEP 打卡助手 · 单个网页文件，离线可用 · 依据运动组规 V1.1、读书组规 V1.4 · 所有时间按北京时间计算</footer>
+</div>
+
+<div class="mbar"><button class="btn primary big" id="copyBtnM" type="button" disabled>复制打卡内容</button></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+'use strict';
+// 必须是第一句：在页面被脚本修改之前留一份原始 HTML，用来生成「专属网页文件」
+const PAGE_SOURCE = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+/* CORE:BEGIN */
+const Core = (() => {
+  const DAY = 864e5;
+  const DEFAULT_REQ = 4;
+  const pad2 = n => String(n).padStart(2, '0');
+  const chars = s => Array.from(String(s == null ? '' : s));
+  const first = s => chars(String(s == null ? '' : s).trim())[0] || '';
+  const S = (t, k = '') => ({ t: String(t), k });
+  const note = (kind, text) => ({ kind, text });
+
+  // ---------- 日期：一律按北京时间。Date 的 UTC 字段里存的是"北京墙上时间" ----------
+  const bjNow = () => new Date(Date.now() + 8 * 3600e3);
+  const dayOf = d => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const addDays = (d, n) => new Date(d.getTime() + n * DAY);
+  const ymd = d => `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}`;
+  const isoDate = d => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+  const md = d => `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+  const fmtDay = d => `${d.getUTCMonth() + 1}月${d.getUTCDate()}日`;
+  const weekday = d => '周' + '日一二三四五六'[d.getUTCDay()];
+  function fromYmd(s) {
+    const m = String(s || '').match(/^(\d{4})-?(\d{2})-?(\d{2})$/);
+    if (!m) return null;
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? d : null;
+  }
+  function isoWeek(d) {
+    const t = dayOf(d);
+    const thu = addDays(t, 4 - (t.getUTCDay() || 7));
+    const year = thu.getUTCFullYear();
+    return { year, week: Math.floor((thu - Date.UTC(year, 0, 1)) / DAY / 7) + 1 };
+  }
+  const monday = d => { const t = dayOf(d); return addDays(t, 1 - (t.getUTCDay() || 7)); };
+  const wLabel = w => `${w.year}W${pad2(w.week)}`;
+  const cmpWeek = (a, b) => (a.year - b.year) || (a.week - b.week);
+
+  // 当前该打哪一期：运动按自然周（周日 24 点截止）；日卡次日 4 点截止；
+  // 周卡是"周日 0 点 – 周三 4 点"，用那个周日代表这一期
+  function defaults(now = bjNow()) {
+    const shifted = dayOf(new Date(now.getTime() - 4 * 3600e3));
+    const dow = shifted.getUTCDay();
+    return {
+      sport: dayOf(now),
+      daily: shifted,
+      weekly: dow <= 2 ? addDays(shifted, -dow) : addDays(shifted, 7 - dow),
+    };
+  }
+
+  // ---------- 文本工具 ----------
+  function lines(text) {
+    return String(text || '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/[​-‍⁠﻿]/g, '')
+      .replace(/ /g, ' ')
+      .split('\n')
+      .map(l => l.replace(/\s+$/, ''));
+  }
+  function merge(segs) {
+    const out = [];
+    for (const s of segs) {
+      if (!s.t) continue;
+      const last = out[out.length - 1];
+      if (last && last.k === s.k) last.t += s.t; else out.push({ t: s.t, k: s.k });
+    }
+    return out;
+  }
+  const toText = L => L.map(l => l.map(s => s.t).join('')).join('\n');
+  function countWords(s) {
+    const t = String(s || '');
+    const cjk = (t.match(/[㐀-䶿一-鿿豈-﫿]/g) || []).length;
+    const latin = (t.match(/[A-Za-z0-9]+(?:['’.\-][A-Za-z0-9]+)*/g) || []).length;
+    return cjk + latin;
+  }
+
+  // ---------- 格式识别 ----------
+  const SPORT_HEAD = /(\d{4})\s*([Ww])\s*(\d{1,2})(\s*[-－]\s*)([^\s\d\-－\/／,，:：])(\s*[-－]?\s*)(\d+)(\s*[\/／]\s*)(\d+)(.*)$/;
+  const SPORT_TOKEN = /([^\s\d\-－\/／,，、;；:：])(\s*)(\d+)(\s*[\/／]\s*)(\d+)/g;
+  const LEAVE_LINE = /^\s*假\s*[:：]\s*/;
+  const DAILY_HEAD = /^\s*(\d{8})(?:(\s*[-－]\s*)假(\s*[:：]\s*)(.*))?$/;
+  const WEEKLY_HEAD = /^\s*(\d{4})\s*[Ww]\s*(\d{1,2})(?:(\s*[-－]\s*)假(\s*[:：]\s*)(.*))?$/;
+  const ROW = /^(\s*)([①-⑳㉑-㉟㊱-㊿])(.*)$/;
+  // 名单行：基本只由「代号n/m」和分隔符组成（避免把「配速 6/1」这种正文当成名单）
+  const isPubLine = l => {
+    const n = (l.match(SPORT_TOKEN) || []).length;
+    const rest = l.replace(SPORT_TOKEN, '').replace(/[\s,，、;；.。]/g, '');
+    return n > 0 && chars(rest).length <= n;
+  };
+
+  function detectKind(text) {
+    for (const l of lines(text)) {
+      if (SPORT_HEAD.test(l)) return 'sport';
+      const d = l.match(DAILY_HEAD);
+      if (d && fromYmd(d[1])) return 'daily';
+      if (WEEKLY_HEAD.test(l)) return 'weekly';
+    }
+    return null;
+  }
+
+  // ======================= 运动小组 =======================
+  function parseSport(text) {
+    const ls = lines(text);
+    const hi = ls.findIndex(l => SPORT_HEAD.test(l));
+    if (hi < 0) return { ok: false, err: '没找到标题行。运动打卡的标题行长这样：2026W43-星2/4，运动' };
+    const h = ls[hi].match(SPORT_HEAD);
+    const r = h[10].match(/^(\s*[,，]\s*)?(.*)$/);
+    const head = { year: +h[1], week: +h[3], d1: h[4], code: h[5], d2: h[6], n: +h[7], sl: h[8], m: +h[9], sep: r[1] || '', content: r[2] };
+
+    let leave = null;
+    for (let i = hi - 1; i >= 0; i--) {
+      const lm = ls[i].match(LEAVE_LINE);
+      if (lm) { leave = { raw: ls[i], prefix: lm[0].trim(), body: ls[i].slice(lm[0].length) }; break; }
+    }
+
+    const pub = [];
+    let last = -1;
+    for (let i = hi + 1; i < ls.length; i++) {
+      const l = ls[i];
+      if (!l.trim()) { pub.push(l); continue; }
+      if (isPubLine(l)) { pub.push(l); last = pub.length - 1; continue; }
+      break;
+    }
+    pub.length = last + 1;
+    if (!pub.length) return { ok: false, err: '找到了标题行，但下面没有大家的计数（形如：印0/4,星1/4）' };
+
+    const tokens = [];
+    pub.forEach((l, li) => {
+      for (const m of l.matchAll(SPORT_TOKEN)) tokens.push({ code: m[1], n: +m[3], m: +m[5], line: li, index: m.index });
+    });
+    return { ok: true, kind: 'sport', head, leave, pub, tokens };
+  }
+
+  function parseSportLeave(body) {
+    const sepM = body.match(/\s*[,，]\s*/);
+    const groups = body.split(/\s*[,，]\s*/).filter(s => s.trim()).map(text => {
+      const m = text.match(/^\s*[Ww]\s*(\d{1,2})\s*[-－]\s*(.*)$/);
+      if (!m) return { text, week: null, entries: [] };
+      const slM = m[2].match(/\s*[\/／]\s*/);
+      return { text, week: +m[1], entries: m[2].split(/\s*[\/／]\s*/).filter(Boolean), sl: slM ? slM[0] : '/' };
+    });
+    return { sep: sepM ? sepM[0] : '，', groups };
+  }
+  const weekDist = (w, tgt) => ((w - tgt) % 53 + 53) % 53;           // w 在 tgt 之后几周（环形）
+  const isPastWeek = (w, tgt) => { const d = weekDist(tgt, w); return d >= 1 && d <= 26; };
+
+  // o: { me, content, week:{year,week}, leave:null|{week:{year,week}, type}, leaveOnly, now }
+  function genSport(p, o) {
+    const notes = [];
+    const me = first(o.me);
+    if (!me) return { ok: false, notes: [note('err', '先点右上角「我的信息」，填上你在运动组的代号')] };
+    const myToks = p.tokens.filter(t => t.code === me);
+    if (!myToks.length) return { ok: false, missing: true, notes: [note('err', `名单里没有「${me}」。代号填错了，还是粘贴的不是运动组的打卡？`)] };
+    if (myToks.length > 1) notes.push(note('warn', `名单里有 ${myToks.length} 个「${me}」，只改了第一个，最好跟组长确认一下`));
+    const mine = myToks[0];
+    const h = p.head;
+    const tgt = o.week;
+    const prevW = { year: h.year, week: h.week };
+    const c = cmpWeek(tgt, prevW);
+    const newWeek = c !== 0;
+    if (c < 0) notes.push(note('warn', `上一条是 ${wLabel(prevW)}，比你选的 ${wLabel(tgt)} 还晚，检查一下周数`));
+    if (c > 0) {
+      notes.push(note('info', `上一条是 ${wLabel(prevW)}，所以按「${wLabel(tgt)} 第一个打卡」处理：所有人的次数已清零。如果这周已经有人打过，请复制最新那条`));
+      if ((monday(fromYmd(`${tgt.year}0104`)) - monday(fromYmd(`${prevW.year}0104`))) / DAY / 7 + tgt.week - prevW.week > 1)
+        notes.push(note('warn', `上一条是 ${wLabel(prevW)} 的，隔了不止一周，确定复制的是最新一条？`));
+    }
+
+    // ---- 请假行 ----
+    const lv = p.leave ? parseSportLeave(p.leave.body) : { sep: '，', groups: [] };
+    let groups = lv.groups;
+    let touched = false;
+    if (c > 0) {
+      const dropped = groups.filter(g => g.week != null && isPastWeek(g.week, tgt.week));
+      if (dropped.length) {
+        groups = groups.filter(g => !dropped.includes(g));
+        touched = true;
+        notes.push(note('info', `已去掉过期的请假：${dropped.map(g => g.text).join('，')}`));
+      }
+    }
+    const leaveThisWeek = !!o.leave && cmpWeek(o.leave.week, tgt) === 0;
+    if (o.leave) {
+      const lw = o.leave.week.week;
+      let g = groups.find(x => x.week === lw);
+      if (g && g.entries.some(e => first(e) === me)) {
+        notes.push(note('warn', `W${pad2(lw)} 已经有你的请假了，没有重复添加`));
+      } else {
+        const add = me + o.leave.type;
+        if (g) { g = Object.assign({}, g, { add }); groups = groups.map(x => (x.week === lw ? g : x)); }
+        else {
+          g = { week: lw, entries: [], isNew: true, add };
+          const at = groups.findIndex(x => x.week != null && weekDist(x.week, tgt.week) > weekDist(lw, tgt.week));
+          groups = groups.slice();
+          groups.splice(at < 0 ? groups.length : at, 0, g);
+        }
+        g.entries = g.entries.concat(add);
+        touched = true;
+      }
+    }
+    const L = [];
+    if (p.leave && !touched) L.push([S(p.leave.raw)]);
+    else if (groups.length) {
+      const segs = [S(p.leave ? p.leave.prefix : '假：', p.leave ? '' : 'me')];
+      groups.forEach((g, i) => {
+        if (i) segs.push(S(lv.sep, g.isNew ? 'me' : ''));
+        if (g.isNew) segs.push(S(`W${pad2(g.week)}-${g.add}`, 'me'));
+        else { segs.push(S(g.text)); if (g.add) segs.push(S(g.sl + g.add, 'me')); }
+      });
+      L.push(merge(segs));
+    }
+
+    // ---- 计数 ----
+    const onLeave = new Set();
+    groups.forEach(g => { if (g.week === tgt.week) g.entries.forEach(e => onLeave.add(first(e))); });
+    const checkin = !o.leaveOnly && !leaveThisWeek;
+    let myN = newWeek ? 0 : mine.n;
+    let myM = newWeek ? (onLeave.has(me) ? 0 : (mine.m || DEFAULT_REQ)) : mine.m;
+    if (leaveThisWeek) { myN = 0; myM = 0; }
+    if (checkin) myN += 1;
+
+    if (leaveThisWeek && !o.leaveOnly) notes.push(note('info', '请的是本周的假，这张就不算打卡了，你的计数改成 0/0'));
+    if (!checkin) notes.push(note('info', `只请假：标题行写成「${me}${myN}/${myM}，请假」。组规没规定这种情况的标题怎么写，群里有固定写法的话粘贴后改一下`));
+    if (checkin) {
+      if (!String(o.content || '').trim()) notes.push(note('warn', '还没填运动内容'));
+      if (myM === 0) notes.push(note('warn', '你本周登记了请假（0/0），确定还要打卡？'));
+      else if (myN > myM) notes.push(note('info', `这是你本周第 ${myN} 张，已经超过 ${myM} 张了`));
+      if (!newWeek && h.code === me) notes.push(note('info', '上一张也是你打的：每天最多一张，两张要间隔 6 小时以上'));
+    }
+    if (o.now) {
+      const cur = isoWeek(o.now);
+      const cc = cmpWeek(tgt, cur);
+      if (cc < 0 && checkin) notes.push(note('warn', `${wLabel(tgt)} 已经截止（周日 24 点）。除非能证明运动时间在截止前，否则不算`));
+      if (cc > 0) notes.push(note('info', `你选的是 ${wLabel(tgt)}，还没到这一周`));
+    }
+
+    const head = merge([
+      S(`${tgt.year}W${pad2(tgt.week)}`, newWeek ? 'chg' : ''),
+      S(h.d1),
+      S(`${me}${h.d2}${myN}${h.sl}${myM}`, 'me'),
+      S(h.sep || '，'),
+      S(checkin ? String(o.content || '').trim() : '请假', 'me'),
+    ]);
+
+    const pubOut = p.pub.map((line, li) => {
+      const segs = [];
+      let last = 0;
+      for (const m of line.matchAll(SPORT_TOKEN)) {
+        const [all, code, sp, n0, sl, m0] = m;
+        segs.push(S(line.slice(last, m.index)));
+        last = m.index + all.length;
+        const isMine = li === mine.line && m.index === mine.index;
+        let n = +n0, mm = +m0;
+        if (isMine) { n = myN; mm = myM; }
+        else if (newWeek) { n = 0; mm = onLeave.has(code) ? 0 : (mm || DEFAULT_REQ); }
+        const changed = n !== +n0 || mm !== +m0;
+        if (isMine) segs.push(S(`${code}${sp}${n}${sl}${mm}`, changed ? 'me' : ''));
+        else { segs.push(S(code + sp)); segs.push(S(`${n}${sl}${mm}`, changed ? 'chg' : '')); }
+      }
+      segs.push(S(line.slice(last)));
+      return merge(segs);
+    });
+
+    return { ok: true, lines: [...L, head, ...pubOut], notes, meta: { newWeek, myN, myM } };
+  }
+
+  // ======================= 读书小组 =======================
+  const codesOf = s => chars(s).filter(ch => !/\s/.test(ch));
+
+  function parseReading(text) {
+    const ls = lines(text);
+    let hi = -1, kind = null, hm = null;
+    for (let i = 0; i < ls.length; i++) {
+      const d = ls[i].match(DAILY_HEAD);
+      if (d && fromYmd(d[1])) { hi = i; kind = 'daily'; hm = d; break; }
+      const w = ls[i].match(WEEKLY_HEAD);
+      if (w) { hi = i; kind = 'weekly'; hm = w; break; }
+    }
+    if (hi < 0) return { ok: false, err: '没找到日期行。日卡第一行长这样：20261020-假：　周卡第一行长这样：2026W41-假：' };
+    const head = kind === 'daily'
+      ? { date: fromYmd(hm[1]), dash: hm[2], colon: hm[3], leave: hm[4] || '' }
+      : { year: +hm[1], week: +hm[2], dash: hm[3], colon: hm[4], leave: hm[5] || '' };
+    head.hasJia = head.dash != null;
+
+    const body = [];
+    let lastRow = -1, i = hi + 1;
+    for (; i < ls.length; i++) {
+      const l = ls[i];
+      const rm = l.match(ROW);
+      if (rm) {
+        const rest = rm[3];
+        const si = rest.search(/[\/／]/);
+        body.push({
+          row: true, pre: rm[1] + rm[2], num: rm[2],
+          slash: si < 0 ? '/' : rest[si], noSlash: si < 0,
+          left: codesOf(si < 0 ? rest : rest.slice(0, si)),
+          right: si < 0 ? [] : codesOf(rest.slice(si + 1)),
+        });
+        lastRow = body.length - 1;
+        continue;
+      }
+      if (!l.trim() || (lastRow < 0 && /周卡/.test(l))) { body.push({ row: false, text: l, divider: /周卡/.test(l) }); continue; }
+      break;
+    }
+    if (lastRow < 0) return { ok: false, err: '找到了日期行，但下面没有 ①②③ 开头的名单' };
+    body.length = lastRow + 1;
+
+    let prevName = '';
+    for (let j = i; j < ls.length; j++) {
+      if (!ls[j].trim()) continue;
+      const nm = ls[j].match(/^\s*(.{1,12}?)\s*(?:[-－—]|《)/);
+      prevName = nm ? nm[1] : '';
+      break;
+    }
+    const rows = body.filter(b => b.row);
+    const total = rows.reduce((a, r) => a + r.left.length + r.right.length, 0);
+    const done = rows.reduce((a, r) => a + r.right.length, 0);
+    return { ok: true, kind, head, body, prevName, total, done, groups: rows.length };
+  }
+
+  // 日卡请假条目（如「朱24-30」）是否已经过期。没有月份，只能猜：
+  // 取离上一条日期最近的那个起始日；只去掉"刚刚过期"的，拿不准的一律保留。
+  function leaveExpired(raw, P, T) {
+    const m = String(raw).match(/^\s*\D+?\s*(\d{1,2})(?:\s*[-－~～—–]\s*(\d{1,2}))?\s*$/);
+    if (!m || !P) return false;
+    const s = +m[1], e = m[2] ? +m[2] : s;
+    let start = null;
+    for (let dm = -1; dm <= 1; dm++) {
+      const d = new Date(Date.UTC(P.getUTCFullYear(), P.getUTCMonth() + dm, s));
+      if (d.getUTCDate() !== s) continue;
+      if (!start || Math.abs(d - P) < Math.abs(start - P)) start = d;
+    }
+    if (!start) return false;
+    const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + (e >= s ? 0 : 1), e));
+    return end < T && (P - end) <= 3 * DAY;
+  }
+
+  // o: { kind:'daily'|'weekly', me, name, book, author, content, date, now,
+  //      daily: leave:null|{from,to}, leaveOnly;  weekly: mode:'checkin'|'leave', note }
+  function genReading(p, o) {
+    const notes = [];
+    const me = first(o.me);
+    const daily = o.kind === 'daily';
+    if (!me) return { ok: false, notes: [note('err', '先点右上角「我的信息」，填上你在读书组的代号')] };
+    const tw = daily ? null : isoWeek(o.date);
+    let same;
+    if (daily) {
+      same = p.kind === 'daily' && ymd(p.head.date) === ymd(o.date);
+      if (p.kind !== 'daily') notes.push(note('warn', '你粘贴的是周卡。日卡应该复制上一条日卡——这里先用周卡里的名单生成了新的一天，发之前核对一下名单'));
+      else if (p.head.date > o.date) notes.push(note('warn', `上一条是 ${fmtDay(p.head.date)}，比你要打的 ${fmtDay(o.date)} 还晚，检查一下日期`));
+      else if (!same) {
+        notes.push(note('info', `上一条是 ${fmtDay(p.head.date)} 的，所以按「今天第一个打卡」处理：日期改成 ${ymd(o.date)}，所有人移回「/」左边。如果今天已经有人打过，请复制最新那条`));
+        if (o.date - p.head.date > DAY) notes.push(note('warn', `上一条是 ${fmtDay(p.head.date)} 的，隔了不止一天，确定复制的是最新一条？`));
+      }
+    } else {
+      same = p.kind === 'weekly' && p.head.year === tw.year && p.head.week === tw.week;
+      if (p.kind !== 'weekly') notes.push(note('warn', '你粘贴的是日卡。周卡应该复制上一条周卡——这里先用日卡里的名单生成了新的周卡，发之前核对一下名单'));
+      else {
+        const c = cmpWeek(tw, p.head);
+        if (c < 0) notes.push(note('warn', `上一条是 ${wLabel(p.head)}，比你选的 ${wLabel(tw)} 还晚，检查一下周数`));
+        else if (c > 0) notes.push(note('info', `上一条是 ${wLabel(p.head)}，所以按「${wLabel(tw)} 第一个」处理：周数已更新、请假已清空、所有人移回「/」左边。如果这期已经有人打过/请过假，请复制最新那条`));
+      }
+    }
+
+    // ---- 名单 ----
+    const rows = p.body.map(b => (b.row
+      ? Object.assign({}, b, { L: b.left.map(c => ({ c, k: '' })), R: b.right.map(c => ({ c, k: '' })) })
+      : b));
+    if (!same) rows.forEach(r => { if (r.row) { r.L = r.L.concat(r.R.map(x => ({ c: x.c, k: 'chg' }))); r.R = []; } });
+    const hits = [];
+    rows.forEach(r => {
+      if (!r.row) return;
+      r.L.forEach((x, i) => { if (x.c === me) hits.push({ r, side: 'L', i }); });
+      r.R.forEach((x, i) => { if (x.c === me) hits.push({ r, side: 'R', i }); });
+    });
+    if (!hits.length) return { ok: false, missing: true, notes: [note('err', `名单里没有「${me}」。代号填错了，还是粘贴的不是读书组的打卡？`)] };
+    if (hits.length > 1) notes.push(note('warn', `名单里有 ${hits.length} 个「${me}」，只动了第一个，最好跟组长确认一下`));
+    rows.forEach(r => { if (r.row && r.noSlash) notes.push(note('info', `上一条第${r.num}行少了「/」，已经补上`)); });
+
+    const isLeave = daily ? !!(o.leave && o.leaveOnly) : o.mode === 'leave';
+    const hit = hits[0];
+    if (!isLeave) {
+      if (hit.side === 'L') { hit.r.L.splice(hit.i, 1); hit.r.R.push({ c: me, k: 'me' }); }
+      else notes.push(note('warn', daily
+        ? '你的代号已经在「/」右边了——今天打过了？要更正的话，紧接在上一个人后面发'
+        : '你的代号已经在「/」右边了——这期周卡打过了？'));
+    }
+
+    // ---- 请假 ----
+    let leaveSegs;
+    if (daily) {
+      const src = p.kind === 'daily' ? p.head.leave : '';
+      const sepM = src.match(/\s*[\/／、，,]\s*/);
+      const sep = sepM ? sepM[0] : '/';
+      let items = src.split(/\s*[\/／、，,]\s*/).filter(s => s.trim());
+      let changed = false;
+      if (!same && p.kind === 'daily' && items.length) {
+        const removed = items.filter(x => leaveExpired(x, p.head.date, o.date));
+        if (removed.length) {
+          items = items.filter(x => !removed.includes(x));
+          changed = true;
+          notes.push(note('info', `已去掉过期的请假：${removed.join('、')}（如果其实还没过期，粘贴后补上）`));
+        }
+      }
+      const base = changed ? items.join(sep) : src;
+      leaveSegs = [S(base)];
+      if (o.leave) {
+        const { from, to } = o.leave;
+        if (!from || !to) notes.push(note('warn', '请假日期还没选完整'));
+        else if (to < from) notes.push(note('warn', '请假的结束日期早于开始日期'));
+        else {
+          if (from <= o.date) notes.push(note('warn', '日卡请假至少要提前一天，从今天开始的假已经来不及了'));
+          const days = Math.round((to - from) / DAY) + 1;
+          if (days > 7) notes.push(note('warn', `一共 ${days} 天，超过 7 天要先找组长批准，否则无效`));
+          if (items.some(x => first(x) === me)) notes.push(note('info', '请假栏里已经有你的一条记录了，又加了一条'));
+          const add = me + from.getUTCDate() + (ymd(to) !== ymd(from) ? '-' + to.getUTCDate() : '');
+          const needSep = base.trim() && !/[\/／、，,]\s*$/.test(base);
+          leaveSegs.push(S((needSep ? sep : '') + add, 'me'));
+        }
+      }
+    } else {
+      const src = same ? p.head.leave : '';
+      leaveSegs = [S(src)];
+      if (isLeave) {
+        if (chars(src).includes(me)) notes.push(note('warn', '「假：」后面已经有你了，没有重复添加'));
+        else {
+          const sepM = src.match(/[\/／、，, ]/);
+          leaveSegs.push(S((src && sepM ? sepM[0] : '') + me, 'me'));
+        }
+        if (same && p.body.some(b => b.row && b.right.length)) notes.push(note('warn', '已经有人开始打这期周卡了，按组规这时候不能再请假'));
+      }
+    }
+
+    // ---- 拼格式部分 ----
+    if (!p.head.hasJia) notes.push(note('info', '上一条日期后面少了「-假：」，已经补上'));
+    const dash = p.head.hasJia ? p.head.dash : '-';
+    const colon = p.head.hasJia ? p.head.colon : '：';
+    const out = [merge([
+      S(daily ? ymd(o.date) : wLabel(tw), same ? '' : 'chg'),
+      S(`${dash}假${colon}`, p.head.hasJia ? '' : 'chg'),
+      ...leaveSegs,
+    ])];
+    const hasDivider = p.body.some(b => !b.row && b.divider);
+    if (!daily && !hasDivider) {
+      out.push([S('————周卡————', 'chg')]);
+      if (p.kind === 'weekly') notes.push(note('info', '上一条少了「————周卡————」这一行，已经补上'));
+    }
+    for (const b of rows) {
+      if (!b.row) { if (!(daily && b.divider)) out.push([S(b.text)]); continue; }
+      out.push(merge([S(b.pre), ...b.L.map(x => S(x.c, x.k)), S(b.slash, b.noSlash ? 'chg' : ''), ...b.R.map(x => S(x.c, x.k))]));
+    }
+
+    // ---- 自己的内容 ----
+    const name = String(o.name || '').trim() || me;
+    const author = String(o.author || '').trim();
+    const book = String(o.book || '').trim().replace(/^《+/, '').replace(/》+$/, '');
+    const content = String(o.content || '').trim();
+    let wordCount = null;
+    if (!isLeave) {
+      if (book || author) { out.push([]); out.push([S(`${name}-${author}《${book}》`, 'txt')]); }
+      if (!book || !author) notes.push(note('warn', `署名行要写成「名字-作者《书名》」，还缺${!author && !book ? '作者和书名' : !author ? '作者' : '书名'}，缺了算格式错误`));
+      if (content) {
+        if (!(book || author)) out.push([]);
+        content.split('\n').forEach(l => out.push([S(l, 'txt')]));
+      } else notes.push(note('warn', daily ? '还没写今天的读书总结' : '还没写本周总结'));
+      if (!daily) {
+        wordCount = countWords(content);
+        if (content && wordCount < 200) notes.push(note('warn', `正文 ${wordCount} 字，不到 200 字（不算标点、作者书名）`));
+      }
+    } else if (!daily) {
+      const n = String(o.note || '').trim();
+      if (n) { out.push([]); n.split('\n').forEach(l => out.push([S(l, 'txt')])); }
+    } else {
+      notes.push(note('info', '只请假：没有加读书内容，你的代号留在「/」左边'));
+    }
+
+    // ---- 时间检查 ----
+    if (o.now) {
+      const d = defaults(o.now);
+      if (daily) {
+        if (o.date < d.daily && !isLeave) notes.push(note('warn', `${fmtDay(o.date)} 的日卡已经截止（次日凌晨 4 点）`));
+        else if (o.date > d.daily) notes.push(note('info', `你选的是 ${fmtDay(o.date)}，还没到这一天`));
+      } else if (!isLeave) {
+        const open = o.date.getTime() - 8 * 3600e3;            // 周日 0 点（北京）
+        const close = open + 3 * DAY + 4 * 3600e3;              // 周三 4 点（北京）
+        const t = o.now.getTime() - 8 * 3600e3;
+        if (t < open) notes.push(note('warn', `${wLabel(tw)} 周卡要到 ${md(o.date)} 周日 0 点以后才算数`));
+        else if (t >= close) notes.push(note('warn', `${wLabel(tw)} 周卡已经截止（${md(addDays(o.date, 3))} 周三凌晨 4 点）`));
+      }
+    }
+
+    return { ok: true, lines: out, notes, meta: { same, wordCount } };
+  }
+
+  return {
+    DAY, pad2, first, bjNow, dayOf, addDays, ymd, isoDate, md, fmtDay, weekday, fromYmd, isoWeek, monday,
+    wLabel, cmpWeek, defaults, lines, toText, countWords, detectKind,
+    parseSport, genSport, parseReading, genReading, leaveExpired,
+  };
+})();
+/* CORE:END */
+
+// =============================== 界面 ===============================
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const TABS = ['sport', 'daily', 'weekly'];
+const TAB_NAME = { sport: '运动打卡', daily: '读书日卡', weekly: '读书周卡' };
+const ME_KEYS = ['sport', 'read', 'name'];
+const LS_KEY = 'lep-checkin:v1';
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+// 被嵌在别的页面里（比如 claude.ai 的预览）时：网址带不了信息、读不了剪贴板、不能下载，相应功能隐藏
+const EMBEDDED = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+if (EMBEDDED) document.documentElement.classList.add('embedded');
+
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch (e) { return {}; } },
+  set(patch) { try { localStorage.setItem(LS_KEY, JSON.stringify(Object.assign(store.get(), patch))); } catch (e) { /* 无痕模式等 */ } },
+};
+const preset = (() => { try { return JSON.parse($('#preset').textContent) || {}; } catch (e) { return {}; } })();
+const saved = store.get();
+
+function readHash() {
+  const raw = location.hash.replace(/^#\/?/, '');
+  const qi = raw.indexOf('?');
+  const tab = qi < 0 ? raw : raw.slice(0, qi);
+  return { tab: TABS.includes(tab) ? tab : null, q: new URLSearchParams(qi < 0 ? '' : raw.slice(qi + 1)) };
+}
+
+// 信息来源优先级：网址 > 本机浏览器记住的 > 专属网页文件里预置的
+const h0 = readHash();
+const pickMe = k => {
+  const v = h0.q.get(k);
+  if (v != null) return v;
+  if (saved.me && saved.me[k]) return saved.me[k];
+  return preset[k] || '';
+};
+const D0 = Core.defaults();
+const state = {
+  tab: h0.tab || saved.tab || 'sport',
+  me: { sport: Core.first(pickMe('sport')), read: Core.first(pickMe('read')), name: pickMe('name').trim() },
+  prev: { sport: '', daily: '', weekly: '' },
+  sample: { sport: false, daily: false, weekly: false },
+  book: saved.book || '',
+  author: saved.author || '',
+  recent: Array.isArray(saved.recent) ? saved.recent.slice(0, 6) : [],
+  // 最近读过的书（作者 + 书名），最多 10 本，最新的在前
+  books: Array.isArray(saved.books) ? saved.books.filter(x => x && x.a && x.b).slice(0, 10) : [],
+  sport: { date: null, content: '', leaveOn: false, leaveOffset: 1, leaveType: 'SJ', leaveOnly: false },
+  daily: { date: null, content: '', leaveOn: false, from: '', to: '', leaveOnly: false },
+  weekly: { date: null, content: '', mode: 'checkin', note: '周卡请假' },
+};
+const drafts = saved.drafts || {};
+if (drafts.daily && drafts.daily.key === Core.ymd(D0.daily)) state.daily.content = drafts.daily.text || '';
+if (drafts.weekly && drafts.weekly.key === Core.ymd(D0.weekly)) state.weekly.content = drafts.weekly.text || '';
+
+const eff = tab => state[tab].date || Core.defaults()[tab];
+
+function persist() {
+  const D = Core.defaults();
+  store.set({
+    me: state.me, tab: state.tab, book: state.book, author: state.author, recent: state.recent, books: state.books,
+    drafts: {
+      daily: { key: Core.ymd(D.daily), text: state.daily.content },
+      weekly: { key: Core.ymd(D.weekly), text: state.weekly.content },
+    },
+  });
+}
+
+function hashFor(tab) {
+  if (EMBEDDED) return '#' + tab;
+  const q = new URLSearchParams();
+  ME_KEYS.forEach(k => { if (state.me[k]) q.set(k, state.me[k]); });
+  const s = q.toString();
+  return '#' + tab + (s ? '?' + s : '');
+}
+function syncUrl() {
+  if (EMBEDDED) return;
+  const target = hashFor(state.tab);
+  if (location.hash === target) return;
+  try { history.replaceState(null, '', target); } catch (e) { location.hash = target; }
+}
+
+// ---------------------------- 计算 ----------------------------
+function compute() {
+  const tab = state.tab;
+  const text = state.prev[tab];
+  if (!text.trim()) return { empty: true };
+  const now = Core.bjNow();
+  const date = eff(tab);
+  if (tab === 'sport') {
+    const p = Core.parseSport(text);
+    if (!p.ok) return { perr: p.err, kind: Core.detectKind(text) };
+    const s = state.sport;
+    const leave = s.leaveOn ? { week: Core.isoWeek(Core.addDays(date, 7 * s.leaveOffset)), type: s.leaveType } : null;
+    return { p, r: Core.genSport(p, { me: state.me.sport, content: s.content, week: Core.isoWeek(date), leave, leaveOnly: !!leave && s.leaveOnly, now }) };
+  }
+  const p = Core.parseReading(text);
+  if (!p.ok) return { perr: p.err, kind: Core.detectKind(text) };
+  const s = state[tab];
+  const o = { kind: tab, me: state.me.read, name: state.me.name, book: state.book, author: state.author, content: s.content, date, now };
+  if (tab === 'daily') {
+    if (s.leaveOn) { o.leave = { from: Core.fromYmd(s.from), to: Core.fromYmd(s.to) }; o.leaveOnly = s.leaveOnly; }
+  } else { o.mode = s.mode; o.note = s.note; }
+  return { p, r: Core.genReading(p, o) };
+}
+
+// ---------------------------- 渲染 ----------------------------
+let lastText = '';
+let lastRes = null;
+
+const EMPTY_HINT = {
+  sport: '在群里复制<b>上一位</b>的打卡，粘贴到上面。这周你是第一个？那就粘贴上周最后一条，会自动清零。',
+  daily: '在群里复制<b>上一位</b>的日卡，粘贴到上面。今天你是第一个？那就粘贴昨天最后一条，会自动重置。',
+  weekly: '在群里复制<b>上一位</b>的周卡，粘贴到上面。这期你是第一个？那就粘贴上周最后一条周卡。',
+};
+// 示例：用当前的日期 / 周数，演示"接着上一位打"的效果
+function sampleFor(tab) {
+  const D = Core.defaults();
+  if (tab === 'sport') {
+    const w = Core.isoWeek(D.sport);
+    const ww = Core.pad2(w.week);
+    return `假：W${ww}-敏NS\n${w.year}W${ww}-星2/4，运动\n印0/4,星2/4,嗖0/4,橙0/4,\n戎1/4,如1/4,呼1/4,山1/4,\n伯1/4,橘0/4,邮1/4,卡2/4,\n敏0/0,柯1/4,欧0/4`;
+  }
+  if (tab === 'daily') {
+    return `${Core.ymd(D.daily)}-假：\n①印山多呼轻飞/苏\n②董杨曾星丁/毛戎\n③欧敏柯晴/福伯\n\n戎-稻盛和夫《干法》\n（这里是上一位的读书总结）`;
+  }
+  return `${Core.wLabel(Core.isoWeek(D.weekly))}-假：\n————周卡————\n①苏多呼轻飞山/印\n②杨董星曾毛戎丁/\n③伯柯敏晴福欧/\n\n印山-雷吉梅克《ASML》\n阿斯麦尔这家公司……`;
+}
+
+function render() {
+  const tab = state.tab;
+  document.body.dataset.tab = tab;
+  document.title = `${TAB_NAME[tab]} · LEP 打卡助手`;
+  $$('.tabs a').forEach(a => {
+    a.href = hashFor(a.dataset.tab);
+    if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+  syncUrl();
+  renderMe();
+  renderPeriod();
+  renderInputs();
+
+  const res = compute();
+  lastRes = res;
+  renderParseInfo(res);
+  renderOutput(res);
+}
+
+function renderMe() {
+  const code = state.tab === 'sport' ? state.me.sport : state.me.read;
+  $('#meAvatar').textContent = code || '?';
+  $('#meLabel').textContent = code ? (state.tab !== 'sport' && state.me.name ? state.me.name : '我的信息') : '设置我的代号';
+}
+
+function relWord(n, unit) {
+  if (n === 0) return unit === '天' ? '今天' : '本周';
+  if (unit === '天') return n === -1 ? '昨天' : n === 1 ? '明天' : `${Math.abs(n)} 天${n < 0 ? '前' : '后'}`;
+  return n === -1 ? '上周' : n === 1 ? '下周' : `${Math.abs(n)} 周${n < 0 ? '前' : '后'}`;
+}
+
+function renderPeriod() {
+  const tab = state.tab;
+  const D = Core.defaults();
+  const d = eff(tab);
+  const diff = Math.round((d - D[tab]) / Core.DAY);
+  let label, sub;
+  if (tab === 'sport') {
+    const mon = Core.monday(d);
+    const wd = Math.round((mon - Core.monday(D.sport)) / Core.DAY / 7);
+    label = Core.wLabel(Core.isoWeek(d));
+    sub = `${Core.md(mon)} – ${Core.md(Core.addDays(mon, 6))} · ${relWord(wd, '周')} · 周日 24 点截止`;
+  } else if (tab === 'daily') {
+    label = `${Core.ymd(d)} ${Core.weekday(d)}`;
+    sub = `${diff === 0 ? '今天的日卡' : relWord(diff, '天') + '的日卡'} · 次日凌晨 4 点截止`;
+  } else {
+    label = `${Core.wLabel(Core.isoWeek(d))} 周卡`;
+    sub = `${diff === 0 ? '当前这期' : relWord(Math.round(diff / 7), '周')} · ${Core.md(d)} 周日 0:00 – ${Core.md(Core.addDays(d, 3))} 周三 4:00`;
+  }
+  $('#perLabel').textContent = label;
+  $('#perSub').textContent = sub;
+  const reset = $('#perReset');
+  reset.hidden = diff === 0;
+  reset.textContent = tab === 'daily' ? '回到今天' : '回到当前这期';
+}
+
+function setVal(el, v) { if (el.value !== v) el.value = v; }
+
+function renderInputs() {
+  const tab = state.tab;
+  if (tab === 'sport') {
+    const s = state.sport;
+    $('#sportLeaveOn').checked = s.leaveOn;
+    $('#sportLeaveFields').hidden = !s.leaveOn;
+    const base = eff('sport');
+    const names = ['本周', '下周', '下下周'];
+    const opts = names.map((n, i) => `<option value="${i}">${n} ${Core.wLabel(Core.isoWeek(Core.addDays(base, 7 * i)))}</option>`).join('');
+    const sel = $('#sportLeaveWeek');
+    if (sel.innerHTML !== opts) sel.innerHTML = opts;
+    sel.value = String(s.leaveOffset);
+    $('#sportLeaveType').value = s.leaveType;
+    $('#sportLeaveOnly').checked = s.leaveOnly;
+    const defaultsChips = ['跑步', '骑行', '健身', '游泳', '爬山', '步数'];
+    const list = Array.from(new Set(state.recent.concat(defaultsChips))).slice(0, 8);
+    const chips = list.map(t => `<button type="button" class="chip" data-v="${esc(t)}">${esc(t)}</button>`).join('');
+    const box = $('#sportChips');
+    if (box.innerHTML !== chips) box.innerHTML = chips;
+  } else if (tab === 'daily') {
+    const s = state.daily;
+    $('#readHeading').textContent = '今天读的';
+    $('#bookFields').hidden = false;
+    $('#dailyLeaveOn').checked = s.leaveOn;
+    $('#dailyLeaveFields').hidden = !s.leaveOn;
+    setVal($('#dailyLeaveFrom'), s.from);
+    setVal($('#dailyLeaveTo'), s.to);
+    $('#dailyLeaveOnly').checked = s.leaveOnly;
+  } else {
+    const s = state.weekly;
+    const leave = s.mode === 'leave';
+    $('#readHeading').textContent = leave ? '周卡请假' : '这周读的';
+    $$('#weeklyMode button').forEach(b => b.classList.toggle('on', b.dataset.mode === s.mode));
+    $('#bookFields').hidden = leave;
+    $('#weeklyContentField').hidden = leave;
+    $('#weeklyNoteField').hidden = !leave;
+    const n = Core.countWords(s.content);
+    const wc = $('#wordCount');
+    wc.textContent = s.content.trim() ? (n >= 200 ? `${n} 字 ✓` : `${n} 字，还差 ${200 - n}`) : '';
+    wc.className = 'count ' + (n >= 200 ? 'ok' : 'short');
+  }
+  if (tab !== 'sport') renderBooks();
+}
+
+const cleanBook = b => String(b || '').trim().replace(/^《+/, '').replace(/》+$/, '');
+function renderBooks() {
+  const box = $('#bookChips');
+  const cur = state.author.trim() + '|' + cleanBook(state.book);
+  const html = state.books.length
+    ? '<span class="recent-lbl">最近读的</span>' + state.books.map((x, i) =>
+      `<span class="chip book${x.a + '|' + x.b === cur ? ' on' : ''}"><button type="button" data-pick="${i}">${esc(x.a)}《${esc(x.b)}》</button><button type="button" class="x" data-del="${i}" title="删掉这条" aria-label="删掉 ${esc(x.a)}《${esc(x.b)}》">×</button></span>`).join('')
+    : '';
+  box.hidden = !state.books.length;
+  if (box.innerHTML !== html) box.innerHTML = html;
+  const opts = list => Array.from(new Set(list)).map(v => `<option value="${esc(v)}"></option>`).join('');
+  const al = opts(state.books.map(x => x.a));
+  const bl = opts(state.books.map(x => x.b));
+  if ($('#authorList').innerHTML !== al) $('#authorList').innerHTML = al;
+  if ($('#bookList').innerHTML !== bl) $('#bookList').innerHTML = bl;
+}
+// 复制读书卡时，把这本书记进「最近读的」
+function rememberBook() {
+  const a = state.author.trim();
+  const b = cleanBook(state.book);
+  if (!a || !b) return;
+  state.books = [{ a, b }].concat(state.books.filter(x => !(x.a === a && x.b === b))).slice(0, 10);
+  persist();
+  renderBooks();
+}
+
+function renderParseInfo(res) {
+  const box = $('#parseInfo');
+  const tab = state.tab;
+  if (res.empty) { box.innerHTML = `<div>${EMPTY_HINT[tab]}</div><div><button class="btn sm" type="button" data-sample>用示例试试</button></div>`; return; }
+  if (res.perr) {
+    let html = `<div class="pi-bad">✕ ${esc(res.perr)}</div>`;
+    if (res.kind && res.kind !== tab) html += `<div class="pi-switch">这段看起来是「${TAB_NAME[res.kind]}」<button class="btn sm" type="button" data-move="${res.kind}">带着这段切过去</button></div>`;
+    box.innerHTML = html;
+    return;
+  }
+  const p = res.p;
+  let summary;
+  let codes;
+  if (tab === 'sport') {
+    summary = `${Core.wLabel(p.head)} · ${p.tokens.length} 人 · 上一位「${esc(p.head.code)}」${p.head.n}/${p.head.m}` + (p.leave && p.leave.body ? ` · 假：${esc(p.leave.body)}` : '');
+    codes = p.tokens.map(t => t.code);
+  } else {
+    const when = p.kind === 'daily' ? `日卡 ${Core.fmtDay(p.head.date)}` : `周卡 ${Core.wLabel(p.head)}`;
+    summary = `${when} · ${p.groups} 组 ${p.total} 人，已打 ${p.done} 人` + (p.prevName ? ` · 上一位：${esc(p.prevName)}` : '') + (p.head.leave ? ` · 假：${esc(p.head.leave)}` : '');
+    codes = [];
+    p.body.forEach(b => { if (b.row) codes.push(...b.left, ...b.right); });
+  }
+  let html = `<div class="pi-ok">✓ 识别成功 <span>${summary}</span></div>`;
+  if (state.sample[tab]) html += '<div class="pi-sample">这是示例。真正打卡时，换成群里上一位的消息。</div>';
+  if (tab !== 'sport' && p.kind !== tab) html += `<div class="pi-switch">这段是「${TAB_NAME[p.kind]}」<button class="btn sm" type="button" data-move="${p.kind}">带着这段切到${TAB_NAME[p.kind]}</button></div>`;
+  const myCode = tab === 'sport' ? state.me.sport : state.me.read;
+  if (!myCode || (res.r && res.r.missing)) {
+    const uniq = Array.from(new Set(codes));
+    html += `<div class="pi-pick">${myCode ? `名单里没有「${esc(myCode)}」。` : ''}你是哪一个？点一下你的代号：${uniq.map(c => `<button type="button" class="chip code" data-code="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
+  }
+  box.innerHTML = html;
+}
+
+const ICON = { err: '✕', warn: '!', info: 'i' };
+function renderOutput(res) {
+  const r = res.r;
+  const ok = !!(r && r.ok);
+  const out = $('#out');
+  out.hidden = !ok;
+  $('#outEmpty').hidden = ok;
+  if (ok) {
+    lastText = Core.toText(r.lines);
+    out.innerHTML = r.lines.map(l => l.map(s => ((s.k === 'me' || s.k === 'chg') ? `<mark class="k-${s.k}">${esc(s.t)}</mark>` : esc(s.t))).join('')).join('\n');
+  } else {
+    lastText = '';
+    $('#outEmpty').innerHTML = res.empty
+      ? '粘贴上一位的打卡后，<b>你的打卡</b>会出现在这里'
+      : res.perr ? '认不出上一条的格式，看左边的提示' : '还差一步，看下面的提示';
+  }
+  const notes = (r && r.notes) || [];
+  $('#notes').innerHTML = notes.map(n => `<li class="n-${n.kind}"><span class="ni"><b>${ICON[n.kind]}</b></span><span>${esc(n.text)}</span></li>`).join('');
+  ['#copyBtn', '#copyBtnM'].forEach(sel => { $(sel).disabled = !ok; });
+}
+
+// ---------------------------- 交互 ----------------------------
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* 退回老办法 */ }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+async function doCopy() {
+  if (!lastText) return;
+  const ok = await copyText(lastText);
+  const btns = [$('#copyBtn'), $('#copyBtnM')];
+  if (ok) {
+    btns.forEach(b => { b.classList.add('copied'); b.firstElementChild ? (b.firstElementChild.textContent = '已复制 ✓ 去群里粘贴吧') : (b.textContent = '已复制 ✓ 去群里粘贴吧'); });
+    clearTimeout(doCopy.timer);
+    doCopy.timer = setTimeout(() => btns.forEach(b => {
+      b.classList.remove('copied');
+      if (b.firstElementChild) b.firstElementChild.textContent = '复制打卡内容'; else b.textContent = '复制打卡内容';
+    }), 2400);
+    const s = state.sport;
+    if (state.tab === 'sport' && s.content.trim() && !(s.leaveOn && s.leaveOnly)) {
+      state.recent = [s.content.trim()].concat(state.recent.filter(x => x !== s.content.trim())).slice(0, 6);
+      persist();
+    }
+    const readCheckin = (state.tab === 'daily' && !(state.daily.leaveOn && state.daily.leaveOnly))
+      || (state.tab === 'weekly' && state.weekly.mode !== 'leave');
+    if (readCheckin) rememberBook();
+  } else {
+    const range = document.createRange();
+    range.selectNodeContents($('#out'));
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    toast(`浏览器不让自动复制，已经帮你选中了，按 ${isMac ? '⌘' : 'Ctrl'}+C`);
+  }
+}
+
+function focusNext() {
+  const tab = state.tab;
+  const order = tab === 'sport' ? ['#sportContent']
+    : tab === 'daily' ? ['#author', '#book', '#dailyContent']
+    : state.weekly.mode === 'leave' ? [] : ['#author', '#book', '#weeklyContent'];
+  for (const sel of order) { const el = $(sel); if (!el.value.trim()) { el.focus(); return; } }
+}
+
+TABS.forEach(t => {
+  const ta = $('#prev-' + t);
+  ta.addEventListener('input', () => { state.prev[t] = ta.value; state.sample[t] = false; render(); });
+  ta.addEventListener('paste', () => setTimeout(() => { if (lastRes && lastRes.r && lastRes.r.ok) focusNext(); }, 0));
+});
+
+$('#pasteBtn').addEventListener('click', async () => {
+  const ta = $('#prev-' + state.tab);
+  try {
+    const t = await navigator.clipboard.readText();
+    if (t && t.trim()) {
+      ta.value = t;
+      state.prev[state.tab] = t;
+      render();
+      if (lastRes && lastRes.r && lastRes.r.ok) focusNext();
+      return;
+    }
+  } catch (e) { /* 没权限 */ }
+  ta.focus();
+  toast(`浏览器不让直接读剪贴板，点进框里按 ${isMac ? '⌘' : 'Ctrl'}+V 粘贴`);
+});
+$('#clearBtn').addEventListener('click', () => {
+  const ta = $('#prev-' + state.tab);
+  ta.value = '';
+  state.prev[state.tab] = '';
+  render();
+  ta.focus();
+});
+
+$('#parseInfo').addEventListener('click', e => {
+  if (e.target.closest('[data-sample]')) {
+    const t = state.tab;
+    state.prev[t] = sampleFor(t);
+    state.sample[t] = true;
+    $('#prev-' + t).value = state.prev[t];
+    render();
+    if (lastRes && lastRes.r && lastRes.r.ok) focusNext();
+    return;
+  }
+  const mv = e.target.closest('[data-move]');
+  if (mv) {
+    const to = mv.dataset.move;
+    state.prev[to] = state.prev[state.tab];
+    $('#prev-' + to).value = state.prev[to];
+    state.prev[state.tab] = '';
+    $('#prev-' + state.tab).value = '';
+    state.tab = to;
+    persist();
+    render();
+    return;
+  }
+  const cd = e.target.closest('[data-code]');
+  if (cd) {
+    const key = state.tab === 'sport' ? 'sport' : 'read';
+    state.me[key] = cd.dataset.code;
+    $(key === 'sport' ? '#setSport' : '#setRead').value = cd.dataset.code;
+    persist();
+    render();
+    toast(`记住了：你是「${cd.dataset.code}」`);
+  }
+});
+
+const bindInput = (sel, fn) => $(sel).addEventListener('input', e => { fn(e.target.value); persist(); render(); });
+bindInput('#sportContent', v => { state.sport.content = v; });
+bindInput('#author', v => { state.author = v; });
+bindInput('#book', v => { state.book = v; });
+bindInput('#dailyContent', v => { state.daily.content = v; });
+bindInput('#weeklyContent', v => { state.weekly.content = v; });
+bindInput('#weeklyNote', v => { state.weekly.note = v; });
+
+$('#bookChips').addEventListener('click', e => {
+  const pick = e.target.closest('[data-pick]');
+  const del = e.target.closest('[data-del]');
+  if (pick) {
+    const x = state.books[+pick.dataset.pick];
+    state.author = x.a;
+    state.book = x.b;
+    $('#author').value = x.a;
+    $('#book').value = x.b;
+    persist();
+    render();
+    const content = $(state.tab === 'daily' ? '#dailyContent' : '#weeklyContent');
+    if (!content.value.trim()) content.focus();
+  } else if (del) {
+    state.books.splice(+del.dataset.del, 1);
+    persist();
+    render();
+  }
+});
+
+$('#sportChips').addEventListener('click', e => {
+  const c = e.target.closest('[data-v]');
+  if (!c) return;
+  const el = $('#sportContent');
+  el.value = c.dataset.v;
+  state.sport.content = c.dataset.v;
+  render();
+  el.focus();
+});
+$('#sportLeaveOn').addEventListener('change', e => { state.sport.leaveOn = e.target.checked; render(); });
+$('#sportLeaveWeek').addEventListener('change', e => { state.sport.leaveOffset = +e.target.value; render(); });
+$('#sportLeaveType').addEventListener('change', e => { state.sport.leaveType = e.target.value; render(); });
+$('#sportLeaveOnly').addEventListener('change', e => { state.sport.leaveOnly = e.target.checked; render(); });
+
+$('#dailyLeaveOn').addEventListener('change', e => {
+  const s = state.daily;
+  s.leaveOn = e.target.checked;
+  if (s.leaveOn && !s.from) s.from = s.to = Core.isoDate(Core.addDays(eff('daily'), 1));
+  render();
+});
+$('#dailyLeaveFrom').addEventListener('change', e => {
+  const s = state.daily;
+  s.from = e.target.value;
+  if (!s.to || s.to < s.from) s.to = s.from;
+  render();
+});
+$('#dailyLeaveTo').addEventListener('change', e => { state.daily.to = e.target.value; render(); });
+$('#dailyLeaveOnly').addEventListener('change', e => { state.daily.leaveOnly = e.target.checked; render(); });
+
+$$('.tabs a').forEach(a => a.addEventListener('click', e => {
+  e.preventDefault();
+  if (state.tab === a.dataset.tab) return;
+  state.tab = a.dataset.tab;
+  persist();
+  render();
+}));
+
+$$('#weeklyMode button').forEach(b => b.addEventListener('click', () => { state.weekly.mode = b.dataset.mode; render(); }));
+
+const STEP = { sport: 7, daily: 1, weekly: 7 };
+const stepPeriod = dir => {
+  const t = state.tab;
+  const next = Core.addDays(eff(t), dir * STEP[t]);
+  state[t].date = Core.ymd(next) === Core.ymd(Core.defaults()[t]) ? null : next;
+  render();
+};
+$('#perPrev').addEventListener('click', () => stepPeriod(-1));
+$('#perNext').addEventListener('click', () => stepPeriod(1));
+$('#perReset').addEventListener('click', () => { state[state.tab].date = null; render(); });
+
+['#copyBtn', '#copyBtnM'].forEach(sel => $(sel).addEventListener('click', doCopy));
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); doCopy(); }
+});
+$('#kbd').textContent = isMac ? '⌘ ↵' : 'Ctrl ↵';
+
+// ---------------------------- 我的信息 ----------------------------
+function openSettings(open) {
+  $('#settings').hidden = !open;
+  $('#meBtn').setAttribute('aria-expanded', String(open));
+}
+$('#meBtn').addEventListener('click', () => openSettings($('#settings').hidden));
+$('#closeSettings').addEventListener('click', () => openSettings(false));
+
+function flashSaved() {
+  const s = $('#savedHint');
+  s.classList.add('show');
+  clearTimeout(flashSaved.timer);
+  flashSaved.timer = setTimeout(() => s.classList.remove('show'), 1500);
+}
+function bindMe(sel, key, isCode) {
+  const el = $(sel);
+  const apply = () => {
+    const v = isCode ? Core.first(el.value) : el.value.trim();
+    if (state.me[key] === v) return;
+    state.me[key] = v;
+    persist();
+    flashSaved();
+    render();
+  };
+  el.addEventListener('input', e => { if (!e.isComposing) apply(); });
+  el.addEventListener('compositionend', apply);
+  if (isCode) el.addEventListener('change', () => { el.value = Core.first(el.value); });
+}
+bindMe('#setSport', 'sport', true);
+bindMe('#setRead', 'read', true);
+bindMe('#setName', 'name', false);
+
+$('#copyLink').addEventListener('click', async () => {
+  syncUrl();
+  toast((await copyText(location.href)) ? '链接已复制，可以存到备忘录或收藏夹' : '复制失败，直接收藏这个页面也行');
+});
+$('#downloadMine').addEventListener('click', () => {
+  const json = JSON.stringify({ sport: state.me.sport, read: state.me.read, name: state.me.name }).replace(/</g, '\\u003c');
+  const html = PAGE_SOURCE.replace(/(<script id="preset" type="application\/json">)[\s\S]*?(<\/script>)/, (m, a, b) => a + json + b);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `LEP打卡助手-${state.me.read || state.me.sport || '我'}.html`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('已下载。放到桌面，双击就能打开');
+});
+
+window.addEventListener('hashchange', () => {
+  const h = readHash();
+  let changed = false;
+  ME_KEYS.forEach(k => {
+    const raw = h.q.get(k);
+    if (raw == null) return;
+    const v = k === 'name' ? raw.trim() : Core.first(raw);
+    if (v !== state.me[k]) { state.me[k] = v; changed = true; }
+  });
+  if (h.tab && h.tab !== state.tab) { state.tab = h.tab; changed = true; }
+  if (changed) { persist(); fillSettings(); }
+  render();
+});
+
+function fillSettings() {
+  $('#setSport').value = state.me.sport;
+  $('#setRead').value = state.me.read;
+  $('#setName').value = state.me.name;
+}
+
+// ---------------------------- 启动 ----------------------------
+fillSettings();
+$('#sportContent').value = state.sport.content;
+$('#author').value = state.author;
+$('#book').value = state.book;
+$('#dailyContent').value = state.daily.content;
+$('#weeklyContent').value = state.weekly.content;
+$('#weeklyNote').value = state.weekly.note;
+if (!state.me.sport && !state.me.read) openSettings(true);
+persist();
+render();
+})();
+</script>
+</body>
+</html>
